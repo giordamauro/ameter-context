@@ -1,14 +1,16 @@
 package org.unicen.ameter.context.engine;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import org.unicen.ameter.context.Bean;
-import org.unicen.ameter.context.BeanConstructorArg;
-import org.unicen.ameter.context.FactoryBean;
+import org.unicen.ameter.context.BeanDeclaration;
+import org.unicen.ameter.context.BeanProperty;
 
 public class BeanContainer {
 
@@ -25,85 +27,150 @@ public class BeanContainer {
 		this.placeholderProperties = placeholderProperties;
 		
 		for(Bean bean : beans) {
-			createBeanInstance(bean);
+			createBean(bean);
 		}
+	}
+	
+	public Object createBean(Bean bean) {
+
+		Object beanInstance = createBeanInstance(bean);
+		addBeanProperties(beanInstance, bean.getProperties());
+		
+		registerBeanInstance(beanInstance, bean.getId());
+        
+		return beanInstance;
 	}
 	
 	public Object createBeanInstance(Bean bean) {
 
-		FactoryBean factoryBean = bean.getFactoryBean();
-		List<BeanConstructorArg> constructorArgs = bean.getConstructorArgs();
-		
-		if(factoryBean != null && constructorArgs != null) {
-			throw new IllegalStateException("Cannot instantiate bean having factoryBean and constructorArgs, only one must be present - " + bean);
-		}
-		
-		Class<?> beanClass = getClassForName(bean.getClassType());
-		Object beanInstance = null;
-		
-		if(constructorArgs != null) {
-    	
-		    Object[] args = getConstructorArgs(constructorArgs);
-    		beanInstance = createInstanceByConstructorArgs(beanClass, args);
-		}
-		else if(factoryBean != null) {
-		    
-		    //TODO: create by FactoryBean
-		}
-		else {
-		    beanInstance = createInstanceByDefaultConstructor(beanClass);
-		}
-		
-        if (bean.getId() != null) {
+	    Objects.requireNonNull(bean, "Bean cannot be null");
+	    
+        if(bean.getFactoryBean() != null && bean.getConstructorArgs() != null) {
+            throw new IllegalStateException("Cannot instantiate bean having factoryBean and constructorArgs, only one must be present - " + bean);
+        }
 
-            if (instancesById.containsKey(bean.getId())) {
-                throw new IllegalStateException(String.format("Bean id %s is not unique - %s", bean.getId(), bean));
-            }
-            instancesById.put(bean.getId(), beanInstance);
+        Object beanInstance = null;
+
+        Class<?> beanClass = getClassForName(bean.getClassType());
+
+        if(bean.getConstructorArgs() != null) {
+
+            List<BeanDeclaration> constructorArgs = bean.getConstructorArgs();
+            List<Object> list = getByDeclarationList(constructorArgs);
+            Object[] args = list.toArray();
+            
+            beanInstance = createInstanceByConstructorArgs(beanClass, args);
+        }
+        else if(bean.getFactoryBean() != null) {
+            
+            //TODO: create by FactoryBean
+            throw new UnsupportedOperationException("Not implemented yet.");
+        }
+        else {
+            beanInstance = createInstanceByDefaultConstructor(beanClass);
         }
         
-//      TODO: Manage more than 1 class instance
-		
-		instancesByClass.put(beanInstance.getClass(), beanInstance);
-		
-		return beanInstance;
-	}
-
-	public Object[] getConstructorArgs(List<BeanConstructorArg> contructorArgs) {
-		
-		Object[] args = new Object[contructorArgs.size()];
-		
-		int i = 0;
-		for(BeanConstructorArg contructorArg : contructorArgs) {
-			
-			if(contructorArg.getRef() != null) {
-				
-			    String ref = contructorArg.getRef();
-			    Object refInstance = getBeanById(ref);
-				
-			    args[i] = refInstance;
-			}
-			else if(contructorArg.getValue() != null) {
-			    
-				String value = contructorArg.getValue();
-				String type = contructorArg.getType();
-				
-				args[i] = getContstructorArgValue(value, type);
-			}
-			else if(contructorArg.getBean() != null) {
-			    
-			    Bean bean = contructorArg.getBean();
-			    args[i] = createBeanInstance(bean);
-			}
-			else {
-			    throw new IllegalStateException("Ref, value or bean must be set");
-			}
-			i++;
-		}
-		return args;
+        return beanInstance;
 	}
 	
-	public Object getContstructorArgValue(String value, String type) {
+	public void addBeanProperties(Object beanInstance, List<BeanProperty> properties) {
+	
+	    Objects.requireNonNull(beanInstance, "BeanInstance cannot be null");
+	    
+	    if(properties != null) {
+	        
+	        for(BeanProperty property : properties) {
+	            
+	            if(property.getName() == null) {
+	                throw new IllegalStateException("BeanProperty name cannot be null");
+	            }
+	            
+	            Object propertyValue = getByDeclaration(property);
+	            setFieldValue(beanInstance, property.getName(), propertyValue);
+	        }
+	    }
+	}
+	
+	public void setFieldValue(Object target, String fieldName, Object value) {
+	    
+	    Objects.requireNonNull(target, "Target cannot be null");
+        Objects.requireNonNull(fieldName, "FieldName cannot be null");
+        
+        Class<?> targetClass = target.getClass();
+	    try {
+            Field propertyField = targetClass.getDeclaredField(fieldName);
+            
+            boolean accessible = propertyField.isAccessible();
+            propertyField.set(target, value);
+            propertyField.setAccessible(accessible);
+            
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+	}
+	
+	public void registerBeanInstance(Object beanInstance, String beanId) {
+	    
+	    Objects.requireNonNull(beanInstance, "BeanInstance cannot be null");
+	    
+	    if (beanId != null) {
+
+            if (instancesById.containsKey(beanId)) {
+                throw new IllegalStateException(String.format("Bean id %s is not unique", beanId));
+            }
+            instancesById.put(beanId, beanInstance);
+        }        
+
+	    // TODO: Manage more than 1 class instance
+        instancesByClass.put(beanInstance.getClass(), beanInstance);
+	}
+
+	public List<Object> getByDeclarationList(List<BeanDeclaration> declarationList) {
+		
+	    List<Object> instanceList = new ArrayList<>();
+	    
+		for(BeanDeclaration contructorArg : declarationList) {
+			
+		    Object beanInstance = getByDeclaration(contructorArg);
+		    instanceList.add(beanInstance);
+		}
+		
+		return instanceList;
+	}
+	
+	public Object getByDeclaration(BeanDeclaration declaration) {
+	    
+	    Object beanInstance = null;
+	    
+	    if(declaration.getRef() != null) {
+            
+            String ref = declaration.getRef();
+            beanInstance = getBeanById(ref);
+        }
+        else if(declaration.getValue() != null) {
+            
+            String value = declaration.getValue();
+            String type = declaration.getType();
+            
+            beanInstance = getValueType(value, type);
+        }
+        else if(declaration.getBean() != null) {
+            
+            Bean bean = declaration.getBean();
+            beanInstance = createBean(bean);
+        }
+        else if(declaration.getList() != null) {
+            
+            beanInstance = getByDeclarationList(declaration.getList());
+        }
+        else {
+            throw new IllegalStateException("Ref, Value, List or Bean must be set");
+        }
+	    
+	    return beanInstance;
+	}
+	
+	public Object getValueType(String value, String type) {
 		
 //	    TODO: Manage primitive types
 	    

@@ -13,7 +13,7 @@ public class Bean {
 	
 	private final List<BeanProperty> properties;
 	
-	private final List<BeanConstructorArg> constructorArgs;
+	private final List<BeanDeclaration> constructorArgs;
 	
 	private final FactoryBean factoryBean;
 
@@ -38,7 +38,7 @@ public class Bean {
 		return properties;
 	}
 
-	public List<BeanConstructorArg> getConstructorArgs() {
+	public List<BeanDeclaration> getConstructorArgs() {
 		return constructorArgs;
 	}
 
