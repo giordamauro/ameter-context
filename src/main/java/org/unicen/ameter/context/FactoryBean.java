@@ -6,10 +6,13 @@ public class FactoryBean {
 	
 	private final String method;
 
+    private final Bean bean;
+
 	private FactoryBean() {
 		
 		this.ref = null;
 		this.method = null;
+        this.bean = null;
 	}
 
 	public String getRef() {
@@ -20,8 +23,12 @@ public class FactoryBean {
 		return method;
 	}
 
+    public Bean getBean() {
+        return bean;
+	}
+
 	@Override
 	public String toString() {
-		return "FactoryBean [ref=" + ref + ", method=" + method + "]";
+        return "FactoryBean [ref=" + ref + ", method=" + method + ", bean=" + bean + "]";
 	}
 }

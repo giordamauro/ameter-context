@@ -20,22 +20,27 @@ public class PlaceholderContainer {
 		
 		this.properties = new HashMap<>();
 
-		List<String> files = propertyPlaceholder.getFiles();
-		Map<String, String> fileProperties = getFileProperties(files);
+		if(propertyPlaceholder.getProperties() != null) {
+		    properties.putAll(propertyPlaceholder.getProperties());
+		}
 		
-		properties.putAll(propertyPlaceholder.getProperties());
-		properties.putAll(fileProperties);
+		List<String> files = propertyPlaceholder.getFiles();
+		if(files != null) {
+    		Map<String, String> fileProperties = getFileProperties(files);
+            
+    		properties.putAll(fileProperties);
+		}
 	}
 
 	public Map<String, String> getFileProperties(List<String> files) {
 
 		Map<String, String> properties = new HashMap<>();
-		
-		for (String file : files) {
-			
-			Map<String, String> fileProperties = getFileProperties(file);
-			properties.putAll(fileProperties);
-		}
+
+        for (String file : files) {
+
+            Map<String, String> fileProperties = getFileProperties(file);
+            properties.putAll(fileProperties);
+        }
 		
 		return properties;
 	}

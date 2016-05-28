@@ -8,11 +8,14 @@ public class BeanConstructorArg {
 	
 	private final String ref;
 
+    private final Bean bean;
+
 	private BeanConstructorArg() {
 
 		this.value = null;
 		this.type = null;
 		this.ref = null;
+        this.bean = null;
 	}
 
 	public String getValue() {
@@ -27,8 +30,12 @@ public class BeanConstructorArg {
 		return type;
 	}
 
+    public Bean getBean() {
+        return bean;
+    }
+
 	@Override
 	public String toString() {
-		return "BeanConstructorArg [value=" + value + ", type=" + type + ", ref=" + ref + "]";
+        return "BeanConstructorArg [value=" + value + ", type=" + type + ", ref=" + ref + ", bean=" + bean + "]";
 	}
 }

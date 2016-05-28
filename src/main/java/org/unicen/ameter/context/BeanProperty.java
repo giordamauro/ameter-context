@@ -8,11 +8,14 @@ public class BeanProperty {
 	
 	private final String ref;
 
+    private final Bean bean;
+
 	private BeanProperty() {
 		
 		this.name = null;
 		this.value = null;
 		this.ref = null;
+        this.bean = null;
 	}
 
 	public String getName() {
@@ -27,8 +30,12 @@ public class BeanProperty {
 		return ref;
 	}
 
+    public Bean getBean() {
+        return bean;
+    }
+
 	@Override
 	public String toString() {
-		return "BeanProperty [name=" + name + ", value=" + value + ", ref=" + ref + "]";
+        return "BeanProperty [name=" + name + ", value=" + value + ", ref=" + ref + ", bean=" + bean + "]";
 	}
 }

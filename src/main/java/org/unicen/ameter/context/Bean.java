@@ -13,7 +13,7 @@ public class Bean {
 	
 	private final List<BeanProperty> properties;
 	
-	private final List<BeanConstructorArg> contructorArgs;
+	private final List<BeanConstructorArg> constructorArgs;
 	
 	private final FactoryBean factoryBean;
 
@@ -22,7 +22,7 @@ public class Bean {
 		this.id = null;
 		this.classType = null;
 		this.properties = null;
-		this.contructorArgs = null;
+		this.constructorArgs = null;
 		this.factoryBean = null;
 	}
 
@@ -38,8 +38,8 @@ public class Bean {
 		return properties;
 	}
 
-	public List<BeanConstructorArg> getContructorArgs() {
-		return contructorArgs;
+	public List<BeanConstructorArg> getConstructorArgs() {
+		return constructorArgs;
 	}
 
 	public FactoryBean getFactoryBean() {
@@ -48,7 +48,7 @@ public class Bean {
 
 	@Override
 	public String toString() {
-		return "Bean [id=" + id + ", classType=" + classType + ", properties=" + properties + ", contructorArgs="
-				+ contructorArgs + ", factoryBean=" + factoryBean + "]";
+		return "Bean [id=" + id + ", classType=" + classType + ", properties=" + properties + ", constructorArgs="
+				+ constructorArgs + ", factoryBean=" + factoryBean + "]";
 	}
 }

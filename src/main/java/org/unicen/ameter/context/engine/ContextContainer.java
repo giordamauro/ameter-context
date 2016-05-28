@@ -14,7 +14,8 @@ public class ContextContainer {
 
 	private final Gson gson;
 	private final Map<String, String> placeholderProperties;
-
+	private final BeanContainer beanContainer;
+	
 	public ContextContainer(String contextFile) {
 
 		Objects.requireNonNull(contextFile, "ContextFile cannot be null");
@@ -24,6 +25,8 @@ public class ContextContainer {
 
 		PlaceholderContainer placeholderContainer = new PlaceholderContainer(context.getPlaceholders());
 		this.placeholderProperties = placeholderContainer.getPlaceholderProperties();
+		
+		this.beanContainer = new BeanContainer(context.getBeans(), placeholderProperties);
 	}
 
 	private Context readJsonContext(String contextFile) {
@@ -45,8 +48,8 @@ public class ContextContainer {
 		return value;
 	}
 	
-	public <T> T getBean(Class<T> beanClass) {
-		return null;
+	public <T> T getBean(Class<T> beanClass) {	    
+	    return beanContainer.getBeanByClass(beanClass);
 	}
 
 	public <T> T getBean(Class<T> beanClass, String beanId) {

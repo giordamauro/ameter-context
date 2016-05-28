@@ -1,0 +1,19 @@
+{
+	"placeholders": {
+		"properties": {
+			"myProperty": "myValue"
+		}
+	},
+	
+	"beans": [
+		{
+			"id": "exampleBean",
+			"class": "org.unicen.ameter.context.BeanExample",
+			"constructorArgs": [
+				{ 
+					"value": "${myProperty}"
+				}
+			]
+		}
+	]
+}

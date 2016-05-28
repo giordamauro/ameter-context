@@ -4,7 +4,6 @@ import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 
 import org.unicen.ameter.context.Bean;
@@ -13,33 +12,59 @@ import org.unicen.ameter.context.FactoryBean;
 
 public class BeanContainer {
 
-	private final Map<String, Object> beanInstances = new HashMap<>();
+    private final Map<String, String> placeholderProperties;
+    
+	private final Map<String, Object> instancesById = new HashMap<>();
+	private final Map<Class<?>, Object> instancesByClass = new HashMap<>();
 	
 	public BeanContainer(List<Bean> beans, Map<String, String> placeholderProperties) {
 	
 		Objects.requireNonNull(beans, "Beans cannot be null");
+        Objects.requireNonNull(placeholderProperties, "PlaceholderProperties cannot be null");
 		
-		Map<String, Bean> beansById = getBeansById(beans);
-		for(Entry<String, Bean> beanById : beansById.entrySet()) {
+		this.placeholderProperties = placeholderProperties;
 		
-			Object beanInstance = createBeanInstance(beanById.getValue(), placeholderProperties);
-			beanInstances.put(beanById.getKey(), beanInstance);
+		for(Bean bean : beans) {
+			createBeanInstance(bean);
 		}
 	}
 	
-	public Object createBeanInstance(Bean bean, Map<String, String> placeholderProperties) {
+	public Object createBeanInstance(Bean bean) {
 
 		FactoryBean factoryBean = bean.getFactoryBean();
-		List<BeanConstructorArg> constructorArgs = bean.getContructorArgs();
+		List<BeanConstructorArg> constructorArgs = bean.getConstructorArgs();
 		
 		if(factoryBean != null && constructorArgs != null) {
 			throw new IllegalStateException("Cannot instantiate bean having factoryBean and constructorArgs, only one must be present - " + bean);
 		}
 		
 		Class<?> beanClass = getClassForName(bean.getClassType());
-		Object[] args = getConstructorArgs(constructorArgs);
+		Object beanInstance = null;
 		
-		Object beanInstance = createInstanceByConstructorArgs(beanClass, args);
+		if(constructorArgs != null) {
+    	
+		    Object[] args = getConstructorArgs(constructorArgs);
+    		beanInstance = createInstanceByConstructorArgs(beanClass, args);
+		}
+		else if(factoryBean != null) {
+		    
+		    //TODO: create by FactoryBean
+		}
+		else {
+		    beanInstance = createInstanceByDefaultConstructor(beanClass);
+		}
+		
+        if (bean.getId() != null) {
+
+            if (instancesById.containsKey(bean.getId())) {
+                throw new IllegalStateException(String.format("Bean id %s is not unique - %s", bean.getId(), bean));
+            }
+            instancesById.put(bean.getId(), beanInstance);
+        }
+        
+//      TODO: Manage more than 1 class instance
+		
+		instancesByClass.put(beanInstance.getClass(), beanInstance);
 		
 		return beanInstance;
 	}
@@ -51,23 +76,27 @@ public class BeanContainer {
 		int i = 0;
 		for(BeanConstructorArg contructorArg : contructorArgs) {
 			
-			String ref = contructorArg.getRef();
 			if(contructorArg.getRef() != null) {
-				Object refInstance = beanInstances.get(ref);
 				
-				if(refInstance == null){
-					throw new IllegalStateException("Cannot find reference: " + ref);
-				}
-				args[i] = refInstance;
+			    String ref = contructorArg.getRef();
+			    Object refInstance = getBeanById(ref);
+				
+			    args[i] = refInstance;
 			}
-			else {
+			else if(contructorArg.getValue() != null) {
+			    
 				String value = contructorArg.getValue();
-				if(value == null) {
-					throw new IllegalStateException("Ref or value must be set");
-				}				
 				String type = contructorArg.getType();
 				
 				args[i] = getContstructorArgValue(value, type);
+			}
+			else if(contructorArg.getBean() != null) {
+			    
+			    Bean bean = contructorArg.getBean();
+			    args[i] = createBeanInstance(bean);
+			}
+			else {
+			    throw new IllegalStateException("Ref, value or bean must be set");
 			}
 			i++;
 		}
@@ -76,10 +105,14 @@ public class BeanContainer {
 	
 	public Object getContstructorArgValue(String value, String type) {
 		
+//	    TODO: Manage primitive types
+	    
 		Object argValue = value;
+		Class<?> valueType = String.class;
+		        
 		if(type != null) {
 		
-			Class<?> valueType = getClassForName(type);
+			valueType = getClassForName(type);
 			if(valueType.isAssignableFrom(Integer.class)){
 				argValue = Integer.valueOf(value);
 			}
@@ -88,10 +121,33 @@ public class BeanContainer {
 			}
 		}
 
+		if(valueType.isAssignableFrom(String.class) && value.startsWith("${") && value.endsWith("}")) {
+		    String propertyName = value.substring(2, value.length() - 1);
+		    String propertyValue = placeholderProperties.get(propertyName);
+		    
+		    if(propertyValue == null) {
+		        throw new IllegalStateException("PropertyName not found - " + propertyName);
+		    }
+		    
+		    argValue = propertyValue;
+		}
+		
 		return argValue;
 	}
 	
-	public Object createInstanceByConstructorArgs(Class<?> beanClass, Object[] contructorArgs) {
+   public Object createInstanceByDefaultConstructor(Class<?> beanClass) {
+
+       try {
+           Object newInstance = beanClass.newInstance();
+           
+           return newInstance;
+           
+       } catch (Exception e) {
+           throw new IllegalStateException(e);
+       }
+   }
+
+   public Object createInstanceByConstructorArgs(Class<?> beanClass, Object[] contructorArgs) {
 		
 		Class<?>[] parameterTypes = new Class<?>[contructorArgs.length];
 		int i = 0;
@@ -110,41 +166,43 @@ public class BeanContainer {
 			throw new IllegalStateException(e);
 		}
 	}
-
-	public Map<String, Bean> getBeansById(List<Bean> beans) {
-
-		Map<String, Bean> beansById = new HashMap<>();
-		
-		for(Bean bean : beans) {
-					
-			String beanId = bean.getId();
-			if(beanId != null) {
-				
-				if(beansById.containsKey(beanId)){
-					throw new IllegalStateException(String.format("Bean id %s is not unique - %s", beanId, bean));
-				}
-				beansById.put(beanId, bean);
-			}
-			else {				
-				String classType = bean.getClassType();
-				Objects.requireNonNull(classType, "Bean class cannot be null");
-				
-				if(beansById.containsKey(classType)){
-					throw new IllegalStateException(String.format("Bean type %s is not unique - %s" , classType, bean));
-				}
-				beansById.put(classType, bean);
-			}
-		}
-	
-		return beansById;
-	}
 	
 	public Class<?> getClassForName(String classType) {
 
+	    Objects.requireNonNull(classType, "ClassType cannot be null");
+	    
 		try {
 			return Class.forName(classType);
 		} catch (ClassNotFoundException e) {
 			throw new IllegalStateException(e);
 		}
 	}
+	
+	public Object getBeanById(String ref) {
+	    
+	    Objects.requireNonNull(ref, "BeanId cannot be null");
+	    Object refInstance = instancesById.get(ref);
+        
+        if(refInstance == null){
+            throw new IllegalStateException("Cannot find reference: " + ref);
+        }
+    
+        return refInstance;
+	}
+	
+	public <T> T getBeanByClass(Class<T> beanType) {
+	    
+	    Objects.requireNonNull(beanType, "BeanType cannot be null");
+	    Object beanInstance = instancesByClass.get(beanType);
+        
+        if(beanInstance == null){
+            throw new IllegalStateException("Cannot find beanType: " + beanType);
+        }
+    
+        @SuppressWarnings("unchecked")
+        T castedInstance = (T) beanInstance;
+        
+        return castedInstance;
+	}
+
 }
